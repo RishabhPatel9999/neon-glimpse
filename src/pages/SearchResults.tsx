@@ -6,105 +6,64 @@ import SearchResultCard from "@/components/SearchResultCard";
 import LoadingSkeleton from "@/components/LoadingSkeleton";
 import FloatingShapes from "@/components/FloatingShapes";
 import StatusBar from "@/components/StatusBar";
-import { AlertCircle } from "lucide-react";
-
-// Mock results for demonstration
-const mockResults = [
-  {
-    title: "Introduction to Neural Networks and Deep Learning",
-    url: "https://neural-academy.io/intro-deep-learning",
-    description: "Comprehensive guide to understanding neural networks, backpropagation algorithms, and modern deep learning architectures. Learn how AI systems process information and make decisions.",
-    category: "education",
-    timestamp: "2h ago",
-  },
-  {
-    title: "Cybersecurity in the Age of Quantum Computing",
-    url: "https://quantumsec.net/quantum-threats",
-    description: "Exploring the implications of quantum computing on current encryption standards and the race to develop quantum-resistant cryptographic protocols for data protection.",
-    category: "security",
-    timestamp: "5h ago",
-  },
-  {
-    title: "The Future of Human-Computer Interfaces",
-    url: "https://techfuture.dev/hci-evolution",
-    description: "From keyboards to neural links: examining the evolution of human-computer interaction and what brain-machine interfaces mean for the future of technology.",
-    category: "technology",
-    timestamp: "1d ago",
-  },
-  {
-    title: "Decentralized Networks and Web3 Architecture",
-    url: "https://web3guide.io/decentralized-future",
-    description: "Understanding the architecture behind decentralized applications, blockchain technology, and the transition from centralized to distributed computing systems.",
-    category: "blockchain",
-    timestamp: "2d ago",
-  },
-  {
-    title: "Artificial General Intelligence: Current Progress",
-    url: "https://agi-research.org/progress-report",
-    description: "A comprehensive overview of current AGI research, the challenges remaining, and expert predictions on when we might achieve human-level artificial intelligence.",
-    category: "research",
-    timestamp: "3d ago",
-  },
-  {
-    title: "Privacy-Preserving Machine Learning Techniques",
-    url: "https://privacyml.tech/techniques",
-    description: "Exploring federated learning, differential privacy, and homomorphic encryption as methods to train AI models while protecting sensitive user data.",
-    category: "privacy",
-    timestamp: "4d ago",
-  },
-  {
-    title: "Edge Computing and IoT Infrastructure",
-    url: "https://edgetech.systems/iot-infrastructure",
-    description: "How edge computing is transforming IoT deployments by processing data closer to the source, reducing latency and improving real-time decision making.",
-    category: "infrastructure",
-    timestamp: "5d ago",
-  },
-  {
-    title: "Synthetic Biology and Computational Design",
-    url: "https://biocompute.science/synthetic-bio",
-    description: "The intersection of biology and computation: how algorithms are being used to design new organisms and revolutionize medicine and materials science.",
-    category: "science",
-    timestamp: "1w ago",
-  },
-];
+import { AlertCircle, WifiOff } from "lucide-react";
+import { searchWeb, SearchResult } from "@/lib/searchApi";
+import { useToast } from "@/hooks/use-toast";
 
 const SearchResults = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
+  const { toast } = useToast();
   
-  const [results, setResults] = useState<typeof mockResults>([]);
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("all");
-  const [timeRange, setTimeRange] = useState("any");
+  const [timeRange, setTimeRange] = useState<"any" | "day" | "week" | "month" | "year">("any");
   const [searchTime, setSearchTime] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const performSearch = async (searchQuery: string) => {
     setIsLoading(true);
+    setError(null);
     const startTime = performance.now();
     
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    // Filter mock results based on query
-    const filtered = mockResults.filter(
-      (result) =>
-        result.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        result.description.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-    
-    const endTime = performance.now();
-    setSearchTime((endTime - startTime) / 1000);
-    
-    // If no matches, show all results
-    setResults(filtered.length > 0 ? filtered : mockResults);
-    setIsLoading(false);
+    try {
+      const response = await searchWeb(searchQuery, {
+        limit: 10,
+        timeFilter: timeRange,
+      });
+      
+      const endTime = performance.now();
+      setSearchTime((endTime - startTime) / 1000);
+      
+      if (response.success && response.data) {
+        setResults(response.data);
+      } else {
+        setError(response.error || "Failed to fetch results");
+        toast({
+          title: "SEARCH_ERROR",
+          description: response.error || "Failed to connect to neural network",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error("Search error:", err);
+      setError("Network connection failed");
+      toast({
+        title: "CONNECTION_FAILED",
+        description: "Unable to reach the search network",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     if (query) {
       performSearch(query);
     }
-  }, [query]);
+  }, [query, timeRange]);
 
   const handleSearch = (newQuery: string) => {
     setSearchParams({ q: newQuery });
@@ -112,9 +71,23 @@ const SearchResults = () => {
 
   const filteredResults = results.filter((result) => {
     if (activeFilter === "all") return true;
-    // Add more filter logic as needed
     return true;
   });
+
+  const getCategoryFromUrl = (url: string): string => {
+    try {
+      const domain = new URL(url).hostname;
+      if (domain.includes("github")) return "code";
+      if (domain.includes("wikipedia")) return "wiki";
+      if (domain.includes("youtube")) return "video";
+      if (domain.includes("reddit")) return "forum";
+      if (domain.includes("stackoverflow")) return "dev";
+      if (domain.includes("arxiv")) return "research";
+      return "web";
+    } catch {
+      return "web";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background relative">
@@ -133,7 +106,7 @@ const SearchResults = () => {
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
             timeRange={timeRange}
-            onTimeRangeChange={setTimeRange}
+            onTimeRangeChange={(range) => setTimeRange(range as typeof timeRange)}
           />
 
           <div className="mt-6">
@@ -145,10 +118,33 @@ const SearchResults = () => {
                 </div>
                 <LoadingSkeleton />
               </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <WifiOff className="w-16 h-16 text-destructive mb-4" />
+                <h2 className="font-display text-2xl text-foreground mb-2">
+                  CONNECTION_ERROR
+                </h2>
+                <p className="text-muted-foreground font-mono text-sm max-w-md mb-4">
+                  {error}
+                </p>
+                <button
+                  onClick={() => performSearch(query)}
+                  className="px-4 py-2 border border-primary text-primary font-mono text-sm hover:bg-primary/10 transition-colors"
+                >
+                  RETRY_CONNECTION
+                </button>
+              </div>
             ) : filteredResults.length > 0 ? (
               <div className="space-y-4">
                 {filteredResults.map((result, index) => (
-                  <SearchResultCard key={index} {...result} index={index} />
+                  <SearchResultCard
+                    key={`${result.url}-${index}`}
+                    title={result.title}
+                    url={result.url}
+                    description={result.description}
+                    category={getCategoryFromUrl(result.url)}
+                    index={index}
+                  />
                 ))}
               </div>
             ) : (
@@ -166,7 +162,7 @@ const SearchResults = () => {
           </div>
 
           {/* Pagination placeholder */}
-          {!isLoading && filteredResults.length > 0 && (
+          {!isLoading && !error && filteredResults.length > 0 && (
             <div className="mt-8 flex justify-center gap-2">
               {[1, 2, 3, 4, 5].map((page) => (
                 <button
