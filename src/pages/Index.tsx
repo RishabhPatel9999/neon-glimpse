@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 import SearchBar from "@/components/SearchBar";
 import CyberLogo from "@/components/CyberLogo";
 import QuickLinks from "@/components/QuickLinks";
@@ -7,16 +6,10 @@ import FloatingShapes from "@/components/FloatingShapes";
 import StatusBar from "@/components/StatusBar";
 
 const Index = () => {
-  const { toast } = useToast();
-  const [searchCount, setSearchCount] = useState(0);
+  const navigate = useNavigate();
 
   const handleSearch = (query: string) => {
-    setSearchCount((prev) => prev + 1);
-    toast({
-      title: "QUERY_INITIATED",
-      description: `Searching neural network for: "${query}"`,
-    });
-    console.log("Search query:", query);
+    navigate(`/search?q=${encodeURIComponent(query)}`);
   };
 
   return (
@@ -35,7 +28,7 @@ const Index = () => {
         </div>
         
         <div className="absolute top-4 right-4 font-mono text-xs text-muted-foreground text-right">
-          <p>QUERIES: <span className="text-primary">{searchCount.toString().padStart(6, "0")}</span></p>
+          <p>NETWORK: <span className="text-primary">CONNECTED</span></p>
           <p>MODE: <span className="text-secondary">NEURAL</span></p>
         </div>
 
